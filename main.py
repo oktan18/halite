@@ -52,7 +52,7 @@ def get_npboard_part_by_point(npboard, point, part_size):
     return res
 
 
-def get_move(board, point, model, part_size=5):
+def get_move(board, point, model, ship_halite, full_halite, part_size=5):
     (
         np_board_halite, np_board_ships, np_board_ships_owners,
         np_board_shipyard, np_board_shipyard_owners
@@ -65,7 +65,8 @@ def get_move(board, point, model, part_size=5):
         np_board_shipyard,
         np_board_shipyard_owners
     ]])
-    step = SHIP_ACTS[np.argmax(model.predict(a.reshape(1, part_size*part_size*5)))]
+    a = np.concatenate([a.reshape(1, part_size*part_size*5), np.array([[ship_halite, full_halite]])], axis=1)
+    step = SHIP_ACTS[np.argmax(model.predict(a))]
     return step
 
 
@@ -79,10 +80,10 @@ def fit(nets):
     c = 0
     for net in nets:
         c += 1
-        if c % 5==0:
+        if c % 5 == 0:
             print('    ', c)
         full_res = []
-        for _ in range(3):
+        for _ in range(10):
             res = eval_model(net.model())
             full_res += [res, ]
         score = np.array(full_res).mean(axis=0)[0]
@@ -95,10 +96,9 @@ def fit(nets):
 class Net:
     def __init__(self, part_size):
 
-
         self.part_size = part_size
 
-        self._acts = np.random.choice(['sigmoid', 'relu', 'softmax', 'tanh', 'elu', 'selu', 'linear'], 3)
+        self._acts = np.random.choice(['relu', 'tanh', 'linear'], 3)
         self._w = None
 
     def init_hyperparams(self):
@@ -109,7 +109,7 @@ class Net:
         return hyperparams
 
     def model(self):
-        inputs = keras.Input(shape=(self.part_size * self.part_size * 5,), name="digits")
+        inputs = keras.Input(shape=(self.part_size * self.part_size * 5 + 2,), name="digits")
         x = keras.layers.Dense(128, activation=self._acts[0], name="dense_1", kernel_initializer='random_normal',
                                bias_initializer='zeros')(inputs)
         x = keras.layers.Dense(32, activation=self._acts[1], name="dense_2", kernel_initializer='random_normal',
@@ -133,6 +133,7 @@ class Net:
 def agent(model):
     def agent_m(model, observation, configuration):
         board = Board(observation, configuration)
+
         me = board.current_player
         if len(me.ships) == 0 and len(me.shipyards) > 0:
             me.shipyards[0].next_action = ShipyardAction.SPAWN
@@ -143,7 +144,7 @@ def agent(model):
 
         for ship in me.ships:
             if ship.next_action == None:
-                step = get_move(board, ship.position, model)
+                step = get_move(board, ship.position, model, ship.halite, me.halite)
                 ship.next_action = step
         return me.next_actions
     return lambda observation, configuration: agent_m(model, observation, configuration)
