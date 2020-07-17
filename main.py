@@ -3,131 +3,142 @@ from kaggle_environments.envs.halite.helpers import *
 
 import numpy as np
 import keras
+from collections import Counter
+import time
+import json
 
-SHIP_ACTS = [ShipAction.NORTH, ShipAction.EAST, ShipAction.SOUTH, ShipAction.WEST, ShipAction.CONVERT, None]
-
-
-def all_board_params(board):
-    board_size = int(np.sqrt(len(board._cells.items())))
-    np_board_halite = np.zeros((board_size, board_size))
-    np_board_ships = np.zeros((board_size, board_size))
-    np_board_ships_owners = np.zeros((board_size, board_size))
-    np_board_shipyard = np.zeros((board_size, board_size))
-    np_board_shipyard_owners = np.zeros((board_size, board_size))
-    for p, val in board._cells.items():
-        np_board_halite[p] = val._halite
-        ship_id = val._ship_id
-        shipyard_id = val._shipyard_id
-        if ship_id:
-            ship, ship_owner = [int(x) for x in ship_id.split('-')]
-        else:
-            ship_owner, ship = 0, -1
-
-        if shipyard_id:
-            shipyard, shipyard_owner = [int(x) for x in shipyard_id.split('-')]
-        else:
-            shipyard, shipyard_owner = -1, -1
-        np_board_ships[p] = ship
-        np_board_ships_owners[p] = ship_owner
-        np_board_shipyard[p] = shipyard
-        np_board_shipyard_owners[p] = shipyard_owner
-    return np_board_halite, np_board_ships + 1, np_board_ships_owners,\
-           np_board_shipyard + 1, np_board_shipyard_owners + 1
-
-
-def get_npboard_part_by_point(npboard, point, part_size):
-    x = point[0]
-    y = npboard.shape[0] - point[1] - 1
-    half_part_size = part_size // 2
-    board_size = npboard.shape[0]
-    big_board = np.concatenate([npboard, npboard, npboard], axis=0)
-    big_board = np.concatenate([big_board, big_board, big_board], axis=1)
-
-    x_min = board_size + x - half_part_size
-    x_max = board_size + x + half_part_size + 1
-    y_min = board_size + y - half_part_size
-    y_max = board_size + y + half_part_size + 1
-
-    res = big_board[x_min: x_max, y_min: y_max]
-    return res
+from extra import agent as extra_agent, get_data, SHIP_ACTS
 
 
 def get_move(board, point, model, ship_halite, full_halite, part_size=5):
-    (
-        np_board_halite, np_board_ships, np_board_ships_owners,
-        np_board_shipyard, np_board_shipyard_owners
-    ) = all_board_params(board)
-
-    a = np.concatenate([get_npboard_part_by_point(x, point, part_size) for x in [
-        np_board_halite,
-        np_board_ships,
-        np_board_ships_owners,
-        np_board_shipyard,
-        np_board_shipyard_owners
-    ]])
-    a = np.concatenate([a.reshape(1, part_size*part_size*5), np.array([[ship_halite, full_halite]])], axis=1)
+    a = get_data(board, point, ship_halite, full_halite, part_size)
     step = SHIP_ACTS[np.argmax(model.predict(a))]
     return step
 
 
 def eval_model(model, board_size=20):
-    environment = make("halite", configuration={"size": board_size, "startingHalite": 1000}, debug=True)
-    environment.run([agent(model), "random", "random", "random"])
+    environment = make("halite", configuration={"size": board_size, "startingHalite": 1000})
+    environment.run([agent(model), extra_agent, extra_agent, extra_agent])
     return eval_env(environment)
 
 
 def fit(nets):
-    c = 0
     for net in nets:
-        c += 1
-        if c % 5 == 0:
-            print('    ', c)
-        full_res = []
-        for _ in range(10):
-            res = eval_model(net.model())
-            full_res += [res, ]
-        score = np.array(full_res).mean(axis=0)[0]
-        wins = np.mean(np.array(full_res)[:, 0] > 0)
+        res = eval_model(net.model())
+        score = res[0]
         net.score = score
-        net.wins = wins
     return nets
+
+
+def selection(nets, p=0.8):
+    selected = sorted(nets, key=lambda x: x.score, reverse=True)
+    return selected[:int(p*len(selected))]
+
+
+def birth(net1, net2):
+    gen = max(net1.gen, net2.gen) + 1
+
+    child = Net(net1.part_size)
+    child.gen = gen
+    randoms = [np.random.random(w.shape) for w in net1.w]
+    child.w = [w1*r + w2*(1-r) for w1, w2, r in zip(net1.w, net2.w, randoms)]
+    return child
+
+
+def mutate(nets):
+    childs = []
+    for _ in range(len(nets)//2):
+        net1, net2 = np.random.choice(nets, 2)
+        child = birth(net1, net2)
+        childs += [child, ]
+    nets += childs
+    return nets
+
+
+def evolution():
+    population = [Net(5) for _ in range(20)]
+    for gen in range(20):
+        print('start population', gen)
+        print('population size is ', len(population))
+        start_time = time.time()
+        population = fit(population)
+        print('population', gen, 'fited', (time.time() - start_time)/60)
+        p = 0.8 if len(population) < 40 else 0.3
+        population = selection(population, p)
+        print(f'best at step {gen}: {population[0].score} from generation {population[0].gen}')
+        print(f'worst at step {gen}: {population[-1].score} from generation {population[-1].gen}')
+        population[0].save_w(f'data/populations/pop{gen}.json')
+        print('gen distribution:', Counter([net.gen for net in population]))
+        population = mutate(population)
 
 
 class Net:
     def __init__(self, part_size):
 
         self.part_size = part_size
+        self.gen = 0
+        self.score = 0
+        self.wins = 0
+        self._model = None
 
-        self._acts = np.random.choice(['relu', 'tanh', 'linear'], 3)
-        self._w = None
+        # self._acts = np.random.choice(['relu', 'tanh', 'linear'], 3)
+        self.acts = ['relu', 'relu', 'relu']
+        self.w = None
 
     def init_hyperparams(self):
         hyperparams = {
-            'acts': self._acts,
-            'w': self._w,
+            'acts': self.acts,
+            'w': self.w,
         }
         return hyperparams
 
+    @property
     def model(self):
-        inputs = keras.Input(shape=(self.part_size * self.part_size * 5 + 2,), name="digits")
-        x = keras.layers.Dense(128, activation=self._acts[0], name="dense_1", kernel_initializer='random_normal',
-                               bias_initializer='zeros')(inputs)
-        x = keras.layers.Dense(32, activation=self._acts[1], name="dense_2", kernel_initializer='random_normal',
-                               bias_initializer='zeros')(x)
-        x = keras.layers.Dense(32, activation=self._acts[2], name="dense_3", kernel_initializer='random_normal',
-                               bias_initializer='zeros')(x)
-        outputs = keras.layers.Dense(6, activation="softmax", name="predictions", kernel_initializer='random_normal',
-                                     bias_initializer='zeros')(x)
-        model = keras.Model(inputs=inputs, outputs=outputs)
-        if self._w is None:
-            self._w = [x.numpy() for x in model.weights]
-        model.set_weights(self._w)
-        return model
+        if self._model is None:
+            inputs = keras.Input(shape=(self.part_size * self.part_size * 5 + 2,), name="digits")
+            x = keras.layers.Dense(128, activation=self.acts[0], name="dense_1", kernel_initializer='random_normal',
+                                   bias_initializer='random_normal')(inputs)
+            x = keras.layers.Dense(32, activation=self.acts[1], name="dense_2", kernel_initializer='random_normal',
+                                   bias_initializer='random_normal')(x)
+            x = keras.layers.Dense(32, activation=self.acts[2], name="dense_3", kernel_initializer='random_normal',
+                                   bias_initializer='random_normal')(x)
+            outputs = keras.layers.Dense(6, activation="softmax", name="predictions", kernel_initializer='random_normal',
+                                         bias_initializer='random_normal')(x)
+            self._model = keras.Model(inputs=inputs, outputs=outputs)
 
-    def play(self, board_size):
+            if self.w is None:
+                self.w = [x.numpy() for x in self._model.weights]
+        return self._model
+
+    def play(self, board_size, mode='train'):
+
         environment = make("halite", configuration={"size": board_size, "startingHalite": 1000}, debug=True)
-        environment.run([agent(self.model()), "random", "random", "random"])
+        environment.run([agent(self.model), extra_agent, extra_agent, extra_agent])
         environment.render(mode="ipython", width=800, height=600)
+
+    def save_w(self, filename):
+        if self.w is None:
+            wx = {}
+        else:
+            wx = [w1.tolist() for w1 in self.w]
+        with open(filename, 'w') as f:
+            json.dump(wx, f)
+
+    def load_w(self, filename):
+        with open(filename, 'r') as f:
+            wx = json.load(f)
+            wx = [np.array(w) for w in wx]
+
+        if wx == {}:
+            wx = None
+        self.w = wx
+
+    def train(self, x, y):
+        self.model.compile(
+            optimizer=keras.optimizers.RMSprop(learning_rate=0.001),
+            loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        )
+        self.model.fit(x, y, epochs=20, verbose=False)
 
 
 def agent(model):
@@ -158,3 +169,7 @@ def eval_env(env):
         max_other = max([res[j] for j in range(len(res)) if i != j])
         r += [score-max_other]
     return r
+
+
+if __name__ == '__main__':
+    evolution()
