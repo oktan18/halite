@@ -2,6 +2,7 @@ from kaggle_environments.envs.halite.helpers import *
 import json
 import numpy as np
 
+
 def getDirTo(fromPos, toPos, size):
     fromX, fromY = divmod(fromPos[0], size), divmod(fromPos[1], size)
     toX, toY = divmod(toPos[0], size), divmod(toPos[1], size)
@@ -20,7 +21,9 @@ ship_states = {}
 X_train = []
 Y_train = []
 
-SHIP_ACTS = [ShipAction.NORTH, ShipAction.EAST, ShipAction.SOUTH, ShipAction.WEST, ShipAction.CONVERT, None]
+SHIP_ACTS = [ShipAction.NORTH, ShipAction.EAST, ShipAction.SOUTH, ShipAction.WEST, ShipAction.CONVERT, None,
+             'DEPOSIT']
+
 
 def all_board_params(board):
     board_size = int(np.sqrt(len(board._cells.items())))
@@ -30,7 +33,7 @@ def all_board_params(board):
     np_board_shipyard = np.zeros((board_size, board_size))
     np_board_shipyard_owners = np.zeros((board_size, board_size))
     for p, val in board._cells.items():
-        np_board_halite[p] = val._halite
+        np_board_halite[board_size-p[1]-1, p[0]] = val._halite
         ship_id = val._ship_id
         shipyard_id = val._shipyard_id
         if ship_id:
@@ -42,12 +45,13 @@ def all_board_params(board):
             shipyard, shipyard_owner = [int(x) for x in shipyard_id.split('-')]
         else:
             shipyard, shipyard_owner = -1, -1
-        np_board_ships[p] = ship
-        np_board_ships_owners[p] = ship_owner
-        np_board_shipyard[p] = shipyard
-        np_board_shipyard_owners[p] = shipyard_owner
+        np_board_ships[board_size-p[1]-1, p[0]] = ship
+        np_board_ships_owners[board_size-p[1]-1, p[0]] = ship_owner
+        np_board_shipyard[board_size-p[1]-1, p[0]] = shipyard
+        np_board_shipyard_owners[board_size-p[1]-1, p[0]] = shipyard_owner
     return np_board_halite, np_board_ships + 1, np_board_ships_owners,\
            np_board_shipyard + 1, np_board_shipyard_owners + 1
+
 
 def get_data(board, point, ship_halite, full_halite, part_size=5):
     (
@@ -82,7 +86,8 @@ def agent(obs, config):
 
     for ship in me.ships:
         data = get_data(board, ship.position, ship.halite, me.halite)
-        X_train += [data, ]
+        X_train +=[data, ]
+        y = None
         if ship.next_action is None:
 
             # Part 1: Set the ship's state
@@ -90,6 +95,7 @@ def agent(obs, config):
                 ship_states[ship.id] = "COLLECT"
             if ship.halite > 500:  # If cargo gets very big, deposit halite
                 ship_states[ship.id] = "DEPOSIT"
+                y = [6, ]
 
             # Part 2: Use the ship's state to select an action
             if ship_states[ship.id] == "COLLECT":
@@ -105,13 +111,15 @@ def agent(obs, config):
                 direction = getDirTo(ship.position, me.shipyards[0].position, size)
                 if direction:
                     ship.next_action = direction
-        Y_train += [i for i in range(len(SHIP_ACTS)) if SHIP_ACTS[i] == ship.next_action]
+        if y is None:
+            y = [i for i in range(len(SHIP_ACTS)) if SHIP_ACTS[i] == ship.next_action]
+        Y_train += y
 
-        with open('data/base/x.json', 'w') as f:
-            json.dump([x.tolist() for x in X_train], f)
-
-        with open('data/base/y.json', 'w') as f:
-            json.dump(Y_train, f)
+        # with open('data/base/x.json', 'w') as f:
+        #     json.dump([x.tolist() for x in X_train], f)
+        #
+        # with open('data/base/y.json', 'w') as f:
+        #     json.dump(Y_train, f)
 
     return me.next_actions
 
@@ -129,5 +137,5 @@ def get_npboard_part_by_point(npboard, point, part_size):
     y_min = board_size + y - half_part_size
     y_max = board_size + y + half_part_size + 1
 
-    res = big_board[x_min: x_max, y_min: y_max]
+    res = big_board[y_min: y_max, x_min: x_max]
     return res
