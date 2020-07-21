@@ -5,7 +5,16 @@ import numpy as np
 DIRECTIONS = [ShipAction.NORTH, ShipAction.EAST, ShipAction.SOUTH, ShipAction.WEST]
 
 
-class BaseShipStateManager:
+class Base:
+    def __init__(self):
+        self.weights = []
+
+    def mutate(self):
+        child = self.__class__()
+        return child
+
+
+class BaseShipStateManager(Base):
     def state(self, ship, observation, configuration):
         board = Board(observation, configuration)
 
@@ -24,7 +33,7 @@ class BaseShipStateManager:
             return "ATTACK"
 
 
-class BaseShipyardManager:
+class BaseShipyardManager(Base):
     def action(self, shipyard, observation, configuration):
         board = Board(observation, configuration)
         me = board.current_player
@@ -36,7 +45,7 @@ class BaseShipyardManager:
             return None
 
 
-class BaseCollectManager:
+class BaseCollectManager(Base):
     def action(self, ship, observation, configuration):
         if ship.cell.halite < 100:
             neighbors = [ship.cell.north.halite, ship.cell.east.halite,
@@ -47,17 +56,17 @@ class BaseCollectManager:
             return None
 
 
-class BaseConvertManager:
+class BaseConvertManager(Base):
     def action(self, ship, observation, configuration):
         return ShipAction.CONVERT
 
 
-class BaseAttackManager:
+class BaseAttackManager(Base):
     def action(self, ship, observation, configuration):
         return None
 
 
-class BaseDepositManager:
+class BaseDepositManager(Base):
     @staticmethod
     def nearest_shipyard(ship, observation=None, configuration=None):
         def distance(a, b):
