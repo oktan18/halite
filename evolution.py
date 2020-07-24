@@ -19,7 +19,6 @@ def eval_env(env):
         score = res[i]
         max_other = max([res[j] for j in range(len(res)) if i != j])
         r += [score-max_other]
-    # print(res)
     return res
 
 
@@ -62,38 +61,46 @@ def mutate(nets):
 
 def evolution():
     population = []
-    for _ in range(20):
+    for _ in range(100):
         shipyard_manager = BaseShipyardManager()
         attack_manager = BaseAttackManager()
         collect_manager = BaseCollectManager()
         convert_manager = BaseConvertManager()
         deposit_manager = BaseDepositManager()
 
+        ship_state_manager = BaseShipStateManager()
+
         net_ship_state_manager = ShipStateNet(5)
+        net_deposit_manager = ShipDepositNet(5)
+        net_collect_manager = ShipCollectNet(5)
 
         net = HaliteManager(
             shipyard_manager=shipyard_manager,
-            ship_state_manager=net_ship_state_manager,
+            ship_state_manager=ship_state_manager,
             attack_manager=attack_manager,
             collect_manager=collect_manager,
             convert_manager=convert_manager,
-            deposit_manager=deposit_manager,
+            deposit_manager=net_deposit_manager,
         )
         population += [net, ]
 
     for gen in range(50):
-        print('start population', gen)
-        print('population size is ', len(population))
-        start_time = time.time()
-        population = fit(population)
-        print('population', gen, 'fited', (time.time() - start_time)/60)
-        p = 0.6 if len(population) < 30 else 0.3
-        population = selection(population, p)
-        print(f'best at step {gen}: {population[0].score} from generation {population[0].generation}')
-        print(f'worst at step {gen}: {population[-1].score} from generation {population[-1].generation}')
-        population[0].save_w(f'data/populations/pop{gen}.json')
-        print('gen distribution:', Counter([net.generation for net in population]))
-        population = mutate(population)
+        if len(population) > 1:
+            print('start population', gen)
+            print('population size is ', len(population))
+            start_time = time.time()
+            population = fit(population)
+            print('population', gen, 'fited', (time.time() - start_time)/60)
+            if gen < 40:
+                p = 0.5
+            else:
+                p = 0.4
+            population = selection(population, p)
+            print(f'best at step {gen}: {population[0].score} from generation {population[0].generation}')
+            print(f'worst at step {gen}: {population[-1].score} from generation {population[-1].generation}')
+            population[0].save_w(f'data/populations/pop{gen}.json')
+            print('gen distribution:', Counter([net.generation for net in population]))
+            population = mutate(population)
 
 
 if __name__ == '__main__':

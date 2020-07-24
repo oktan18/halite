@@ -31,7 +31,7 @@ def all_board_params(board):
            np_board_shipyard + 1, np_board_shipyard_owners + 1
 
 
-def get_data(board, point, ship_halite, full_halite, part_size=5):
+def get_data(board, point, add_lst, part_size=5):
     (
         np_board_halite, np_board_ships, np_board_ships_owners,
         np_board_shipyard, np_board_shipyard_owners
@@ -44,7 +44,7 @@ def get_data(board, point, ship_halite, full_halite, part_size=5):
         # np_board_shipyard,
         np_board_shipyard_owners
     ]])
-    return np.concatenate([a.reshape(1, part_size * part_size * 3), np.array([[ship_halite, full_halite]])], axis=1)
+    return np.concatenate([a.reshape(1, part_size * part_size * 3), np.array([add_lst])], axis=1)
 
 
 def get_npboard_part_by_point(npboard, point, part_size):

@@ -36,7 +36,6 @@ def agent(obs, config):
         me.ships[0].next_action = ShipAction.CONVERT
 
     for ship in me.ships:
-        data = get_data(board, ship.position, ship.halite, me.halite)
         if ship.next_action is None:
 
             # Part 1: Set the ship's state
