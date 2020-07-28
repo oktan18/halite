@@ -12,31 +12,22 @@ from main import HaliteManager
 from nets import *
 
 
-def eval_env(env):
-    res = [x[0] for x in env.steps[-1][0]['observation']['players']]
-    r = []
-    for i in range(len(res)):
-        score = res[i]
-        max_other = max([res[j] for j in range(len(res)) if i != j])
-        r += [score-max_other]
-    return res
-
-
-def eval_model(model, board_size=20):
-    environment = make("halite", configuration={"size": board_size, "startingHalite": 1000})
-    environment.run([model, extra_agent, extra_agent, extra_agent])
-    return eval_env(environment)
+def eval_model(model, env):
+    env.run([model, extra_agent, extra_agent, extra_agent])
+    scores = [x[0] for x in env.steps[-1][0]['observation']['players']]
+    return scores[0]
 
 
 def fit(nets):
     for net in nets:
-        res = eval_model(lambda x, y: net.agent(x, y))
-        score = res[0]
+        environment = make("halite", configuration={"size": 20, "startingHalite": 1000})
+        env = deepcopy(environment)
+        score = eval_model(lambda x, y: net.agent(x, y), env)
         net.score = score
     return nets
 
 
-def selection(nets, p=0.8):
+def selection(nets, p):
     selected = sorted(nets, key=lambda x: x.score, reverse=True)
     return selected[:int(p*len(selected))]
 
@@ -50,7 +41,7 @@ def mutate(nets):
     else:
         p = scores - min(scores) / (max(scores) - min(scores)) + 1
     p = p / sum(p)
-    for _ in range(len(nets)):
+    for _ in range(2*len(nets)):
         net = np.random.choice(nets, p=p)
         child = net.mutate()
         childs += [child, ]
@@ -84,19 +75,17 @@ def evolution():
         )
         population += [net, ]
 
-    for gen in range(50):
+    for gen in range(200):
         if len(population) > 1:
             print('start population', gen)
             print('population size is ', len(population))
             start_time = time.time()
             population = fit(population)
-            print('population', gen, 'fited', (time.time() - start_time)/60)
-            if gen < 40:
-                p = 0.5
-            else:
-                p = 0.4
+            print('population', gen, 'fited', (time.time() - start_time) / 60)
+            p = 0.334
             population = selection(population, p)
             print(f'best at step {gen}: {population[0].score} from generation {population[0].generation}')
+            print(f'scores of winner: {population[0].scores}')
             print(f'worst at step {gen}: {population[-1].score} from generation {population[-1].generation}')
             population[0].save_w(f'data/populations/pop{gen}.json')
             print('gen distribution:', Counter([net.generation for net in population]))

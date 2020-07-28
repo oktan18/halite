@@ -87,8 +87,6 @@ class ShipDepositNet(BaseNet):
 
     def init_model(self):
         inputs = keras.Input(shape=(self.part_size * self.part_size * 3 + 4), name="digits")
-        x = keras.layers.Dense(32, activation="linear", name="dense_1", kernel_initializer='random_normal',
-                               bias_initializer='random_normal')(inputs)
         x = keras.layers.Dense(16, activation="tanh", name="dense_1", kernel_initializer='random_normal',
                                bias_initializer='random_normal')(inputs)
         x = keras.layers.Dense(16, activation="relu", name="dense_4", kernel_initializer='random_normal',
@@ -118,8 +116,6 @@ class ShipCollectNet(BaseNet):
 
     def init_model(self):
         inputs = keras.Input(shape=(self.part_size * self.part_size * 3 + 2), name="digits")
-        x = keras.layers.Dense(32, activation="linear", name="dense_1", kernel_initializer='random_normal',
-                               bias_initializer='random_normal')(inputs)
         x = keras.layers.Dense(16, activation="tanh", name="dense_1", kernel_initializer='random_normal',
                                bias_initializer='random_normal')(inputs)
         x = keras.layers.Dense(16, activation="relu", name="dense_4", kernel_initializer='random_normal',

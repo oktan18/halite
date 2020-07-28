@@ -37,9 +37,14 @@ class HaliteManager:
     @property
     def score(self):
         if len(self._scores) > 0:
-            return np.mean(self._scores)
+            # return np.mean(self._scores)
+            return self._scores[-1]
         else:
             return 0
+
+    @property
+    def scores(self):
+        return self._scores
 
     @score.setter
     def score(self, s):
