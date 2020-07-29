@@ -103,7 +103,9 @@ class ShipDepositNet(BaseNet):
         nearest_shipyard = self.nearest_shipyard(ship, observation, configuration)
 
         inpt = get_data(board, ship.position, [
-            ship.halite, me.halite, nearest_shipyard[0] - ship.position[0], nearest_shipyard[1] - ship.position[1]
+            np.log(ship.halite/100), np.log(me.halite/100),
+            (nearest_shipyard[0] - ship.position[0])/5,
+            (nearest_shipyard[1] - ship.position[1])/5
         ], self.part_size)
         step = self.actions[np.argmax(self.model.predict(inpt))]
         return step

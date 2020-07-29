@@ -3,7 +3,7 @@ import json
 import numpy as np
 
 
-def all_board_params(board):
+def all_board_params(board, player_id=1):
     board_size = int(np.sqrt(len(board._cells.items())))
     np_board_halite = np.zeros((board_size, board_size))
     np_board_ships = np.zeros((board_size, board_size))
@@ -11,31 +11,46 @@ def all_board_params(board):
     np_board_shipyard = np.zeros((board_size, board_size))
     np_board_shipyard_owners = np.zeros((board_size, board_size))
     for p, val in board._cells.items():
-        np_board_halite[board_size-p[1]-1, p[0]] = val._halite
+        row = board_size-p[1]-1
+        col = p[0]
+        np_board_halite[row, col] = val._halite
+
+        np_board_halite = np.log(np_board_halite/100)
+
         ship_id = val._ship_id
         shipyard_id = val._shipyard_id
         if ship_id:
             ship, ship_owner = [int(x) for x in ship_id.split('-')]
+            if ship_owner == player_id:
+                ship_owner = 1
+            else:
+                ship_owner = 2
         else:
-            ship_owner, ship = 0, -1
+            ship, ship_owner = -1, 0
 
         if shipyard_id:
             shipyard, shipyard_owner = [int(x) for x in shipyard_id.split('-')]
+            if shipyard_owner == player_id:
+                shipyard_owner = 1
+            else:
+                shipyard_owner = 2
         else:
-            shipyard, shipyard_owner = -1, -1
-        np_board_ships[board_size-p[1]-1, p[0]] = ship
-        np_board_ships_owners[board_size-p[1]-1, p[0]] = ship_owner
-        np_board_shipyard[board_size-p[1]-1, p[0]] = shipyard
-        np_board_shipyard_owners[board_size-p[1]-1, p[0]] = shipyard_owner
+            shipyard, shipyard_owner = -1, 0
+
+        np_board_ships[row, col] = ship
+        np_board_ships_owners[row, col] = ship_owner
+        np_board_shipyard[row, col] = shipyard
+        np_board_shipyard_owners[row, col] = shipyard_owner
+
     return np_board_halite, np_board_ships + 1, np_board_ships_owners,\
-           np_board_shipyard + 1, np_board_shipyard_owners + 1
+           np_board_shipyard + 1, np_board_shipyard_owners
 
 
-def get_data(board, point, add_lst, part_size=5):
+def get_data(board, point, add_lst, player_id, part_size=5):
     (
         np_board_halite, np_board_ships, np_board_ships_owners,
         np_board_shipyard, np_board_shipyard_owners
-    ) = all_board_params(board)
+    ) = all_board_params(board, player_id)
 
     a = np.concatenate([get_npboard_part_by_point(x, point, part_size) for x in [
         np_board_halite,

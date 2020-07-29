@@ -39,7 +39,7 @@ def mutate(nets):
     if max(scores) == min(scores):
         p = np.ones(len(scores))
     else:
-        p = scores - min(scores) / (max(scores) - min(scores)) + 1
+        p = (scores - min(scores)) / (max(scores) - min(scores))
     p = p / sum(p)
     for _ in range(2*len(nets)):
         net = np.random.choice(nets, p=p)
