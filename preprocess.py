@@ -15,11 +15,12 @@ def all_board_params(board, player_id=1):
         col = p[0]
         np_board_halite[row, col] = val._halite
 
-        np_board_halite = np.log(np_board_halite/100)
+        np_board_halite = np.log(np_board_halite/100 + 1)
 
         ship_id = val._ship_id
         shipyard_id = val._shipyard_id
         if ship_id:
+
             ship, ship_owner = [int(x) for x in ship_id.split('-')]
             if ship_owner == player_id:
                 ship_owner = 1
