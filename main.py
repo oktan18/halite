@@ -53,14 +53,18 @@ class HaliteManager:
     def convert(self, ship=None, board=None):
         return self.convert_manager.action(ship, board)
 
-    def agent(self, observation, configuration):
+    @property
+    def agent(self):
+        return lambda observation, configuration: self.move(observation, configuration)
+
+    def move(self, observation, configuration):
         board = Board(observation, configuration)
         me = board.current_player
         actions_to_apply = []
 
         for shipyard in me.shipyards:
             shipyard.next_action = self.shipyard_manager.action(shipyard, board)
-            actions_to_apply += (shipyard, shipyard.next_action)
+            actions_to_apply += [(shipyard, shipyard.next_action), ]
             board.next()
 
         for ship in me.ships:
@@ -68,7 +72,7 @@ class HaliteManager:
 
             ship.next_action = self.state_dict[state](ship, board)
 
-            actions_to_apply += (ship, ship.next_action)
+            actions_to_apply += [(ship, ship.next_action), ]
             board.next()
             #
             # if isinstance(self.ship_state_manager, ShipStateNet):

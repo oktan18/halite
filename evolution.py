@@ -22,7 +22,7 @@ def fit(nets):
     for net in nets:
         environment = make("halite", configuration={"size": 20, "startingHalite": 1000})
         env = deepcopy(environment)
-        score = eval_model(lambda x, y: net.agent(x, y), env)
+        score = eval_model(net.agent, env)
         net.score = score
     return nets
 
@@ -52,7 +52,7 @@ def mutate(nets):
 
 def evolution():
     population = []
-    for _ in range(100):
+    for _ in range(10):
         shipyard_manager = BaseShipyardManager()
         collect_manager = BaseCollectManager()
         convert_manager = BaseConvertManager()
