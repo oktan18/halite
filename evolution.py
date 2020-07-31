@@ -54,7 +54,6 @@ def evolution():
     population = []
     for _ in range(100):
         shipyard_manager = BaseShipyardManager()
-        attack_manager = BaseAttackManager()
         collect_manager = BaseCollectManager()
         convert_manager = BaseConvertManager()
         deposit_manager = BaseDepositManager()
@@ -62,13 +61,12 @@ def evolution():
         ship_state_manager = BaseShipStateManager()
 
         net_ship_state_manager = ShipStateNet(5)
-        net_deposit_manager = ShipDepositNet(5)
-        net_collect_manager = ShipCollectNet(5)
+        net_deposit_manager = ShipCollectOrDepositNet(5)
+        net_collect_manager = ShipCollectOrDepositNet(5)
 
         net = HaliteManager(
             shipyard_manager=shipyard_manager,
             ship_state_manager=ship_state_manager,
-            attack_manager=attack_manager,
             collect_manager=collect_manager,
             convert_manager=convert_manager,
             deposit_manager=net_deposit_manager,

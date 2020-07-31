@@ -15,8 +15,7 @@ class Base:
 
 
 class BaseShipStateManager(Base):
-    def state(self, ship, observation, configuration):
-        board = Board(observation, configuration)
+    def state(self, ship, board):
 
         me = board.current_player
 
@@ -34,8 +33,7 @@ class BaseShipStateManager(Base):
 
 
 class BaseShipyardManager(Base):
-    def action(self, shipyard, observation, configuration):
-        board = Board(observation, configuration)
+    def action(self, shipyard, board):
         me = board.current_player
 
         # If there are no ships, use first shipyard to spawn a ship.
@@ -46,7 +44,7 @@ class BaseShipyardManager(Base):
 
 
 class BaseCollectManager(Base):
-    def action(self, ship, observation, configuration):
+    def action(self, ship, board):
         if ship.cell.halite < 100:
             neighbors = [ship.cell.north.halite, ship.cell.east.halite,
                          ship.cell.south.halite, ship.cell.west.halite]
@@ -57,35 +55,29 @@ class BaseCollectManager(Base):
 
 
 class BaseConvertManager(Base):
-    def action(self, ship, observation, configuration):
+    def action(self, ship, board):
         return ShipAction.CONVERT
-
-
-class BaseAttackManager(Base):
-    def action(self, ship, observation, configuration):
-        return None
 
 
 class BaseDepositManager(Base):
     @staticmethod
-    def nearest_shipyard(ship, observation=None, configuration=None):
+    def nearest_shipyard(ship, board):
         def distance(a, b):
             return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
-        def get_shipyards():
-            board = Board(observation, configuration)
+        def get_shipyards(board):
             me = board.current_player
             return [shipyard.position for shipyard in me.shipyards]
 
         ship_point = ship.position
-        shipyards = get_shipyards()
+        shipyards = get_shipyards(board)
         nearest_shipyard = shipyards[np.argmin([distance(ship_point, s) for s in shipyards])]
         return nearest_shipyard
 
-    def action(self, ship, observation, configuration):
+    def action(self, ship, board):
         fromX, fromY = ship.position
 
-        toX, toY = self.nearest_shipyard(ship, observation, configuration)
+        toX, toY = self.nearest_shipyard(ship, board)
 
         act = None
         if fromY < toY:

@@ -1,8 +1,5 @@
 import json
-
-from kaggle_environments.envs.halite.helpers import *
 from base import *
-from nets import ShipStateNet
 
 
 class HaliteManager:
@@ -10,7 +7,6 @@ class HaliteManager:
             self,
             shipyard_manager: BaseShipyardManager,
             ship_state_manager: BaseShipStateManager,
-            attack_manager: BaseAttackManager,
             collect_manager: BaseCollectManager,
             convert_manager: BaseConvertManager,
             deposit_manager: BaseDepositManager
@@ -19,14 +15,12 @@ class HaliteManager:
         self.shipyard_manager = shipyard_manager
 
         self.collect_manager = collect_manager
-        self.attack_manager = attack_manager
         self.convert_manager = convert_manager
         self.deposit_manager = deposit_manager
 
         self.state_dict = {
             "COLLECT": self.collect,
             "CONVERT": self.convert,
-            "ATTACK": self.attack,
             "DEPOSIT": self.deposit,
         }
 
@@ -50,40 +44,43 @@ class HaliteManager:
     def score(self, s):
         self._scores += [s, ]
 
-    def deposit(self, ship, observation, configuration):
-        return self.deposit_manager.action(ship, observation, configuration)
+    def deposit(self, ship, board):
+        return self.deposit_manager.action(ship, board)
 
-    def collect(self, ship, observation=None, configuration=None):
-        return self.collect_manager.action(ship, observation, configuration)
+    def collect(self, ship, board=None):
+        return self.collect_manager.action(ship, board)
 
-    def attack(self, ship, observation=None, configuration=None):
-        return self.attack_manager.action(ship, observation, configuration)
-
-    def convert(self, ship=None, observation=None, configuration=None):
-        return self.convert_manager.action(ship, observation, configuration)
+    def convert(self, ship=None, board=None):
+        return self.convert_manager.action(ship, board)
 
     def agent(self, observation, configuration):
         board = Board(observation, configuration)
         me = board.current_player
+        actions_to_apply = []
 
         for shipyard in me.shipyards:
-            shipyard.next_action = self.shipyard_manager.action(shipyard, observation, configuration)
+            shipyard.next_action = self.shipyard_manager.action(shipyard, board)
+            actions_to_apply += (shipyard, shipyard.next_action)
+            board.next()
 
         for ship in me.ships:
-            state = self.ship_state_manager.state(ship, observation, configuration)
+            state = self.ship_state_manager.state(ship, board)
 
-            ship.next_action = self.state_dict[state](ship, observation, configuration)
+            ship.next_action = self.state_dict[state](ship, board)
+
+            actions_to_apply += (ship, ship.next_action)
+            board.next()
             #
             # if isinstance(self.ship_state_manager, ShipStateNet):
             #     print('state', state)
             #     print('act', ship.next_action)
-
+        for item, act in actions_to_apply:
+            item.next_action = act
         return me.next_actions
 
     def mutate(self):
         child_shipyard_manager = self.shipyard_manager.mutate()
         child_ship_state_manager = self.ship_state_manager.mutate()
-        child_attack_manager = self.attack_manager.mutate()
         child_collect_manager = self.collect_manager.mutate()
         child_convert_manager = self.convert_manager.mutate()
         child_deposit_manager = self.deposit_manager.mutate()
@@ -91,7 +88,6 @@ class HaliteManager:
         child = self.__class__(
             child_shipyard_manager,
             child_ship_state_manager,
-            child_attack_manager,
             child_collect_manager,
             child_convert_manager,
             child_deposit_manager,
@@ -104,7 +100,6 @@ class HaliteManager:
         wx = {
             'shipyard_manager': [w1.tolist() for w1 in self.shipyard_manager.weights],
             'ship_state_manager': [w1.tolist() for w1 in self.ship_state_manager.weights],
-            'attack_manager': [w1.tolist() for w1 in self.attack_manager.weights],
             'collect_manager': [w1.tolist() for w1 in self.collect_manager.weights],
             'convert_manager': [w1.tolist() for w1 in self.convert_manager.weights],
             'deposit_manager': [w1.tolist() for w1 in self.deposit_manager.weights]
@@ -121,7 +116,6 @@ class HaliteManager:
 
         self.shipyard_manager.weights = wx['shipyard_manager']
         self.ship_state_manager.weights = wx['ship_state_manager']
-        self.attack_manager.weights = wx['attack_manager']
         self.collect_manager.weights = wx['collect_manager']
         self.convert_manager.weights = wx['convert_manager']
         self.deposit_manager.weights = wx['deposit_manager']
