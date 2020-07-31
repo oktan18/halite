@@ -22,11 +22,13 @@ class BaseShipStateManager(Base):
         if len(me.shipyards) == 0:
             return "CONVERT"
 
+        elif ship.halite > 50:  # If cargo gets very big, deposit halite
+            return "DEPOSIT"
+
         elif ship.halite <= 500:  # If cargo is too low, collect halite
             return "COLLECT"
 
-        elif ship.halite > 50:  # If cargo gets very big, deposit halite
-            return "DEPOSIT"
+
 
         elif ship.halite == -1000:  # If cargo gets very big, deposit halite
             return "ATTACK"

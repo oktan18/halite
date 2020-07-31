@@ -52,7 +52,7 @@ def mutate(nets):
 
 def evolution():
     population = []
-    for _ in range(10):
+    for _ in range(100):
         shipyard_manager = BaseShipyardManager()
         collect_manager = BaseCollectManager()
         convert_manager = BaseConvertManager()
